@@ -11,11 +11,12 @@ pub(crate) struct Context {
 impl Context {
     pub(crate) fn new() -> Context {
         let ptr = unsafe { ffi::lvm_init(ptr::null()) };
-        eprintln!("creating context, ptr = {:p}", ptr);
+        trace!("creating context, ptr = {:p}", ptr);
         Context { ptr: ptr }
     }
 
     pub(crate) fn scan(&self) -> Option<Error> {
+        trace!("scanning, ptr = {:p}", self.ptr);
         if unsafe { ffi::lvm_scan(self.ptr) } != 0 {
             Some(self.last_error())
         } else {

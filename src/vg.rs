@@ -26,10 +26,10 @@ impl Context {
     pub(crate) fn list_volume_groups(&self) -> 
         DeviceMapperList<ffi::lvm_str_list> 
     {
-        eprintln!("listing vgs, context = {:p}", self.ptr);
+        trace!("listing vgs, context = {:p}", self.ptr);
         let list = unsafe { ffi::lvm_list_vg_names(self.ptr) };
 
-        eprintln!("listing vgs, list = {:p}", list);
+        trace!("listing vgs, list = {:p}", list);
 
         if list == ptr::null_mut() {
             let error = self.last_error();
@@ -44,8 +44,9 @@ pub fn list_volume_groups() -> Vec<VolumeGroup> {
     let context = Context::new();
 
     if let Some(err) = context.scan() {
-        println!("scanning error: {}", err)
+        panic!("scanning error: {}", err)
     }
+
     context.list_volume_groups().iter().map(|e| {
         let ptr = unsafe {
             CStr::from_ptr((*e).str)

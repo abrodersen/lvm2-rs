@@ -38,7 +38,7 @@ impl<'a, T: Element> Iterator for DeviceMapperListIterator<'a, T> {
     type Item = *const T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        eprintln!("pos = {:p}, head = {:p}", self.pos, self.list.head);
+        trace!("pos = {:p}, head = {:p}", self.pos, self.list.head);
         if self.pos != self.list.head {
             let item = get_list_item::<T>(self.pos);
             let next = unsafe { *self.pos };
