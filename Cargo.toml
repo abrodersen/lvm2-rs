@@ -1,0 +1,9 @@
+[package]
+name = "lvm2"
+version = "0.1.0"
+authors = ["Aaron Brodersen <aaron@abrodersen.com>"]
+
+[dependencies]
+failure = "0.1"
+failure_derive = "0.1"
+lvm2-sys = { version = "0.1", path ="lvm2-sys" }

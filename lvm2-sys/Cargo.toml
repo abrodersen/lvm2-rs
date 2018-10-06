@@ -1,0 +1,9 @@
+[package]
+name = "lvm2-sys"
+version = "0.1.0"
+authors = ["Aaron Brodersen <aaron@abrodersen.com>"]
+
+[build-dependencies]
+bindgen="0.42.0"
+
+[dependencies]
