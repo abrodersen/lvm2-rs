@@ -4,6 +4,7 @@ use context::Context;
 use mapper::{Element, DeviceMapperList};
 use vg::{VolumeGroup, VolumeGroupHandle};
 
+use std::mem;
 use std::ptr;
 use std::ffi::CStr;
 
@@ -25,8 +26,17 @@ impl Drop for LogicalVolumeListHandle {
     }
 }
 
+impl Element for ffi::lvm_lv_list {
+    fn next_offset() -> usize {
+        let addr: Self = unsafe { mem::uninitialized() };
+        let base = &addr as *const _ as usize;
+        let next = &addr.list.n as *const _ as usize;
+        next - base
+    }
+}
+
 impl<'a> VolumeGroupHandle<'a> {
-    pub(crate) fn list_logical_volumes(&self) -> DeviceMapperList<ffi::lvm_str_list, LogicalVolumeListHandle> {
+    pub(crate) fn list_logical_volumes(&self) -> DeviceMapperList<ffi::lvm_lv_list, LogicalVolumeListHandle> {
         trace!("listing lvs, vg = {:p}", self.ptr);
         let list = unsafe { ffi::lvm_vg_list_lvs(self.ptr) };
 
@@ -39,7 +49,7 @@ impl<'a> VolumeGroupHandle<'a> {
 
         let handle = LogicalVolumeListHandle { ptr: list };
 
-        unsafe { DeviceMapperList::<ffi::lvm_str_list, LogicalVolumeListHandle>::create(handle) }
+        unsafe { DeviceMapperList::<ffi::lvm_lv_list, LogicalVolumeListHandle>::create(handle) }
     }
 }
 
@@ -55,24 +65,10 @@ pub fn list_logical_volumes(vg: &VolumeGroup) -> Vec<LogicalVolume> {
 
     handle.list_logical_volumes().iter().map(|e| {
         trace!("lv list element, ptr = {:?}", e);
-
-        let ptr = unsafe {
-            CStr::from_ptr((*e).str)
-        };
-
-        trace!("lv uuid, ptr = {:p}", ptr);
-
-        let uuid = ptr.to_str()
-            .expect("invalid LV uuid")
-            .to_string();
-
-        trace!("lv uuid = {}", uuid);
         
-        let lv_handle = unsafe {
-            ffi::lvm_lv_from_uuid(handle.ptr, (*e).str)
-        };
+        let lv_handle = unsafe { *e }.lv;
 
-        trace!("lv ptr = {:p}", lv_handle);
+        trace!("lv, ptr = {:p}", lv_handle);
 
         let name_ptr = unsafe {
             CStr::from_ptr(ffi::lvm_lv_get_name(lv_handle))
