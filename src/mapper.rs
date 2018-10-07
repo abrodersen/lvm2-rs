@@ -1,45 +1,57 @@
 
 use ffi;
 
+use common::ListHandle;
+
 use std::marker::PhantomData;
+use std::mem;
 
 pub trait Element {
     fn next_offset() -> usize;
 }
 
-pub(crate) struct DeviceMapperList<T: Element> {
-  head: *const ffi::dm_list,
+impl Element for ffi::lvm_str_list_t {
+    fn next_offset() -> usize {
+        let addr: Self = unsafe { mem::uninitialized() };
+        let base = &addr as *const _ as usize;
+        let next = &addr.list.n as *const _ as usize;
+        next - base
+    }
+}
+
+pub(crate) struct DeviceMapperList<T: Element, H: ListHandle> {
+  handle: H,
   _marker: PhantomData<T>,
 }
 
-impl<T: Element> DeviceMapperList<T> {
-    pub(crate) unsafe fn create(ptr: *const ffi::dm_list) -> DeviceMapperList<T> {
+impl<T: Element, H: ListHandle> DeviceMapperList<T, H> {
+    pub(crate) unsafe fn create(handle: H) -> DeviceMapperList<T, H> {
         DeviceMapperList {
-            head: ptr,
+            handle: handle,
             _marker: PhantomData::<T>
         }
     }
 
-    pub(crate) fn iter<'a>(&'a self) -> DeviceMapperListIterator<'a, T> {
-        let next = unsafe { *self.head };
-        DeviceMapperListIterator::<'a, T> {
+    pub(crate) fn iter<'a>(&'a self) -> DeviceMapperListIterator<'a, T, H> {
+        let next = unsafe { *self.handle.as_raw() };
+        DeviceMapperListIterator::<'a, T, H> {
             list: self,
             pos: next.n,
         }
     }
 }
 
-pub(crate) struct DeviceMapperListIterator<'a, T: 'a + Element> {
-    list: &'a DeviceMapperList<T>,
+pub(crate) struct DeviceMapperListIterator<'a, T: 'a + Element, H: 'a + ListHandle> {
+    list: &'a DeviceMapperList<T, H>,
     pos: *const ffi::dm_list,
 }
 
-impl<'a, T: Element> Iterator for DeviceMapperListIterator<'a, T> {
+impl<'a, T: Element, H: ListHandle> Iterator for DeviceMapperListIterator<'a, T, H> {
     type Item = *const T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        trace!("pos = {:p}, head = {:p}", self.pos, self.list.head);
-        if self.pos != self.list.head {
+        trace!("pos = {:p}, head = {:p}", self.pos, self.list.handle.as_raw());
+        if self.pos != self.list.handle.as_raw() {
             let item = get_list_item::<T>(self.pos);
             let next = unsafe { *self.pos };
             self.pos = next.n;
