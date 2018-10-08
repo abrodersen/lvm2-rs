@@ -39,35 +39,23 @@ impl Context {
         }
     }
 
-    pub fn list_volume_group_names<'a>(&'a self) -> StringList<'a> {
+    pub fn list_volume_group_names<'a>(&'a self) -> StringListIterator<'a> {
         trace!("listing vg names, context = {:p}", self.ptr);
         let list = unsafe { ffi::lvm_list_vg_names(self.ptr) };
-        let handle = list::ListHandle::<CString>::new(self, list);
+        let handler = list::Handle::new(list);
+        let iter = list::DeviceMapperIterator::new(handler);
 
-        StringList {
-            inner: handle
-        }
-    }
-}
-
-
-pub struct StringList<'a> {
-    inner: list::ListHandle<'a, CString>,
-}
-
-impl<'a, 'b> StringList<'a> {
-    pub fn iter(&'b self) -> StringListIterator<'a, 'b> {
         StringListIterator {
-            inner: self.inner.iter(),
+            inner: iter
         }
     }
 }
 
-pub struct StringListIterator<'a: 'b, 'b> {
-    inner: list::ListHandleIterator<'a, 'b, ffi::lvm_str_list, CString>,
+pub struct StringListIterator<'a> {
+    inner: list::DeviceMapperIterator<'a, ffi::lvm_str_list>,
 }
 
-impl<'a, 'b: 'a> Iterator for StringListIterator<'a, 'b> {
+impl<'a> Iterator for StringListIterator<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<String> {

@@ -3,26 +3,54 @@ use context::Context;
 
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
+use std::mem;
 
 use ffi;
+
+#[derive(PartialEq, Eq, Clone)]
+pub(crate) struct Handle<'a> {
+    ptr: *mut ffi::dm_list,
+    _data: PhantomData<&'a ffi::dm_list>,
+}
+
+impl<'a> Handle<'a> {
+    pub(crate) fn new(ptr: *mut ffi::dm_list) -> Handle<'a> {
+        Handle { 
+            ptr: ptr,
+            _data: PhantomData::<&'a ffi::dm_list>,
+        }
+    }
+
+    fn follow<'b>(&'b self) -> Handle<'b> {
+        let ptr = unsafe { *self.ptr }.n;
+        Handle::new(ptr)
+    }
+}
 
 pub(crate) trait Node {
     type Item;
 
-    fn next(&self) -> *mut ffi::dm_list;
-    fn into(*mut ffi::dm_list) -> Self;
+    fn next<'a>(&'a self) -> Handle<'a>;
+    fn from_handle<'a>(h: Handle<'a>) -> Self;
     fn item(&self) -> Self::Item;
 }
 
 impl Node for ffi::lvm_str_list {
     type Item = CString;
 
-    fn next(&self) -> *mut ffi::dm_list {
-        self.list.n
+    fn next<'a>(&'a self) -> Handle<'a> {
+        Handle::new(self.list.n)
     }
 
-    fn into(ptr: *mut ffi::dm_list) -> Self {
-        unsafe { *(ptr as *mut Self) }
+    fn from_handle<'a>(h: Handle<'a>) -> Self {
+        let addr: Self = unsafe { mem::uninitialized() };
+        let base = &addr as *const _ as usize;
+        let next = &addr.list.n as *const _ as usize;
+        let offset = next - base;
+
+        let ptr = h.ptr as *const _ as usize;
+        let self_ptr = (ptr - offset) as *const Self;
+        unsafe { *self_ptr }
     }
 
     fn item(&self) -> CString {
@@ -30,57 +58,35 @@ impl Node for ffi::lvm_str_list {
     }
 }
 
-pub(crate) trait Element {
-    fn element(*const ffi::dm_list) -> *const Self;
+pub(crate) struct DeviceMapperIterator<'a, N: Node> {
+    base: Handle<'a>,
+    pos: *mut ffi::dm_list,
+    _data: PhantomData<N>,
 }
 
-pub(crate) struct ListHandle<'a, T> {
-    ctx: &'a Context,
-    ptr: *mut ffi::dm_list,
-    _data: PhantomData<T>,
-}
-
-impl<'a, T> ListHandle<'a, T> {
-    pub(crate) fn new(ctx: &'a Context, ptr: *mut ffi::dm_list) -> ListHandle<'a, T> {
-        ListHandle {
-            ctx: ctx,
-            ptr: ptr,
-            _data: PhantomData::<T>,
-        }
-    }
-
-    pub(crate) fn iter<'b, N>(&'b self) -> ListHandleIterator<'a, 'b, N, T> 
-        where N: Node<Item=T>
-    {
-        ListHandleIterator {
-            handle: self,
-            pos: None,
+impl<'a, N: Node> DeviceMapperIterator<'a, N> {
+    pub(crate) fn new(h: Handle<'a>) -> DeviceMapperIterator<'a, N> {
+        DeviceMapperIterator {
+            base: h.clone(),
+            pos: h.follow().ptr,
+            _data: PhantomData::<N>,
         }
     }
 }
 
-pub(crate) struct ListHandleIterator<'a: 'b, 'b, N, T: 'a> 
-    where N: Node<Item=T>
-{
-    handle: &'b ListHandle<'a, T>,
-    pos: Option<N>,
-}
-
-impl<'a, 'b: 'a, N, T: 'b> Iterator for ListHandleIterator<'a, 'b, N, T> 
+impl<'a, N, T> Iterator for DeviceMapperIterator<'a, N> 
     where N: Node<Item=T>
 {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = match self.pos {
-            Some(ref p) => p.next(),
-            None => unsafe { *self.handle.ptr }.n,
-        };
-
-        if next != self.handle.ptr {
-            let node = N::into(next);
+        let tmp = Handle::new(self.pos);
+        if tmp != self.base {
+            let node = N::from_handle(tmp.clone());
             let item = node.item();
-            self.pos = Some(node);
+
+            let next = tmp.follow();
+            self.pos = next.ptr;
             Some(item)
         } else {
             None
