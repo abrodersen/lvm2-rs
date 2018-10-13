@@ -1,6 +1,4 @@
 
-use context::Context;
-
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::mem;
@@ -35,28 +33,7 @@ pub(crate) trait Node {
     fn item(&self) -> Self::Item;
 }
 
-impl Node for ffi::lvm_str_list {
-    type Item = CString;
 
-    fn next<'a>(&'a self) -> Handle<'a> {
-        Handle::new(self.list.n)
-    }
-
-    fn from_handle<'a>(h: Handle<'a>) -> Self {
-        let addr: Self = unsafe { mem::uninitialized() };
-        let base = &addr as *const _ as usize;
-        let next = &addr.list.n as *const _ as usize;
-        let offset = next - base;
-
-        let ptr = h.ptr as *const _ as usize;
-        let self_ptr = (ptr - offset) as *const Self;
-        unsafe { *self_ptr }
-    }
-
-    fn item(&self) -> CString {
-        unsafe { CStr::from_ptr(self.str).into() }
-    }
-}
 
 pub(crate) struct DeviceMapperIterator<'a, N: Node> {
     base: Handle<'a>,
@@ -93,3 +70,49 @@ impl<'a, N, T> Iterator for DeviceMapperIterator<'a, N>
         }
     }
 }
+
+impl Node for ffi::lvm_str_list {
+    type Item = CString;
+
+    fn next<'a>(&'a self) -> Handle<'a> {
+        Handle::new(self.list.n)
+    }
+
+    fn from_handle<'a>(h: Handle<'a>) -> Self {
+        let addr: Self = unsafe { mem::uninitialized() };
+        let base = &addr as *const _ as usize;
+        let next = &addr.list.n as *const _ as usize;
+        let offset = next - base;
+
+        let ptr = h.ptr as *const _ as usize;
+        let self_ptr = (ptr - offset) as *const Self;
+        unsafe { *self_ptr }
+    }
+
+    fn item(&self) -> CString {
+        unsafe { CStr::from_ptr(self.str).into() }
+    }
+}
+
+impl Node for ffi::lvm_lv_list {
+    type Item = ffi::lv_t;
+
+    fn next<'a>(&'a self) -> Handle<'a> {
+        Handle::new(self.list.n)
+    }
+
+    fn from_handle<'a>(h: Handle<'a>) -> Self {
+        let addr: Self = unsafe { mem::uninitialized() };
+        let base = &addr as *const _ as usize;
+        let next = &addr.list.n as *const _ as usize;
+        let offset = next - base;
+
+        let ptr = h.ptr as *const _ as usize;
+        let self_ptr = (ptr - offset) as *const Self;
+        unsafe { *self_ptr }
+    }
+
+    fn item(&self) -> Self::Item {
+        self.lv
+    }
+} 
