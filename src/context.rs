@@ -105,7 +105,7 @@ impl<'a> VolumeGroup<'a> {
         let handler = list::Handle::new(list);
         list::DeviceMapperIterator::<ffi::lvm_lv_list>::new(handler)
             .map(|ptr| {
-                LogicalVolume { ptr: ptr, _vg: self }
+                LogicalVolume { ptr: ptr, vg: self }
             })
             .collect::<Vec<_>>()
     }
@@ -113,12 +113,14 @@ impl<'a> VolumeGroup<'a> {
 
 impl<'a> Drop for VolumeGroup<'a> {
     fn drop(&mut self) {
-        unsafe { ffi::lvm_vg_close(self.ptr) };
+        trace!("freeing vg, ptr = {:p}", self.ptr);
+        let result = unsafe { ffi::lvm_vg_close(self.ptr) };
+        trace!("vg freed, result = {}", result);
     }
 }
 
 pub struct LogicalVolume<'a: 'b, 'b> {
-    _vg: &'b VolumeGroup<'a>,
+    vg: &'b VolumeGroup<'a>,
     ptr: ffi::lv_t,
 }
 
@@ -127,6 +129,26 @@ impl<'a, 'b> LogicalVolume<'a, 'b> {
         let id = unsafe { ffi::lvm_lv_get_name(self.ptr) };
         let wrap = unsafe { CStr::from_ptr::<'b>(id) };
         wrap.to_str().expect("invalid lv name")
+    }
+
+    pub fn origin(&self) -> Option<&'b str> {
+        let origin = unsafe { ffi::lvm_lv_get_origin(self.ptr) };
+        if origin == ptr::null() {
+            return None;
+        }
+
+        let wrap = unsafe { CStr::from_ptr::<'b>(origin) };
+        Some(wrap.to_str().expect("invalid lv name"))
+    }
+
+    pub fn snapshot(&self, name: &str, size: u64) -> LogicalVolume<'a, 'b> {
+        let name = CString::new(name).expect("invalid snapshot name");
+        let snap = unsafe { ffi::lvm_lv_snapshot(self.ptr, name.as_ptr(), size) };
+        if snap == ptr::null_mut() {
+            panic!("failed to create snap: {}", self.vg.ctx.last_error())
+        }
+
+        LogicalVolume { ptr: snap, vg: self.vg }
     }
 }
 
