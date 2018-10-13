@@ -145,10 +145,16 @@ impl<'a, 'b> LogicalVolume<'a, 'b> {
         let name = CString::new(name).expect("invalid snapshot name");
         let snap = unsafe { ffi::lvm_lv_snapshot(self.ptr, name.as_ptr(), size) };
         if snap == ptr::null_mut() {
-            panic!("failed to create snap: {}", self.vg.ctx.last_error())
+            panic!("failed to create snapshot: {}", self.vg.ctx.last_error())
         }
 
         LogicalVolume { ptr: snap, vg: self.vg }
+    }
+
+    pub fn remove(self) {
+        if unsafe { ffi::lvm_vg_remove_lv(self.ptr) } != 0 {
+            panic!("failed to remove lv: {}", self.vg.ctx.last_error());
+        }
     }
 }
 
