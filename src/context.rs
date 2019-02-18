@@ -131,6 +131,10 @@ impl<'a, 'b> LogicalVolume<'a, 'b> {
         wrap.to_str().expect("invalid lv name")
     }
 
+    pub fn size(&self) -> u64 {
+        unsafe { ffi::lvm_lv_get_size(self.ptr) }
+    }
+
     pub fn origin(&self) -> Option<&'b str> {
         let origin = unsafe { ffi::lvm_lv_get_origin(self.ptr) };
         if origin == ptr::null() {
