@@ -8,6 +8,7 @@ documentation = "https://docs.rs/lvm2"
 license = "MIT/Apache-2.0"
 keywords = ["lvm", "lvm2"]
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
 failure = "0.1"

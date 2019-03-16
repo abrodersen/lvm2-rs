@@ -1,7 +1,7 @@
 
 use ffi;
 
-use list;
+use crate::list;
 
 use std::ptr;
 use std::ffi::{CStr, CString};
