@@ -2,6 +2,12 @@
 name = "lvm2"
 version = "0.1.0"
 authors = ["Aaron Brodersen <aaron@abrodersen.com>"]
+homepage = "https://github.com/abrodersen/lvm2-rs"
+repository = "https://github.com/abrodersen/lvm2-rs"
+documentation = "https://docs.rs/lvm2"
+license = "MIT/Apache-2.0"
+keywords = ["lvm", "lvm2"]
+readme = "README.md"
 
 [dependencies]
 failure = "0.1"
